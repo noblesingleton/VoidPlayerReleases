@@ -75,20 +75,204 @@
 
 ---
 
-# CURRENT RELEASE — VOID Player v3.10.HF
+# CURRENT RELEASE — VOID Player v3.10.HK
 
 Newest documentation first. Older release notes and historical lore follow below (newest → oldest).
 
----
-
-# CURRENTLY SHIPPING — v3.10.HF complete inventory
-
-**Tag:** `v3.10.HF` (restore: `_restore_points/ship_HF_clean_audio_20260724_164534`)  
+**Tag:** `v3.10.HK` (builds on HF clean audio + HJ UI/device polish)  
 **Product:** VOID Player / VoidPlayer_Clean (JUCE 7 desktop app, Windows primary)  
 **License:** Free personal use = **`EULA.md`**; commercial = **`LICENSE_COMMERCIAL.md`** / considerthecoin@protonmail.com  
 **Copyright:** Timothy Hart Branton JR aka NobleSingleton @OuterWebster / VOID Player  
 
-This section is the **authoritative inventory of what the HF ship build actually runs** (compile-time flags, defaults, audio graph, DSP, UI, OS integration). Earlier README lore may describe historical or extreme experiments; **this section wins for “what ships now.”**
+---
+
+## Third-party feedback — bugs squashed (HJ / HK)
+
+Feedback from the first external test (Exclusive toggle, UI scale, system audio, missing plain-language control docs). What shipped in response:
+
+| Report | Status | What we did |
+|--------|--------|-------------|
+| **Exclusive OFF while playing → static / garbage** | **Fixed (HK)** | Mode switch always **stops** playback (no hot-swap under live audio). Reopen uses proper named WASAPI open (`openWasapiOutput`). Transport **fully rebuilds** VoidBuffering + rate path for the new device rate. Billboard: press Play when ready. |
+| **Illegal characters on status billboard after Exclusive toggle** | **Fixed (HK)** | Status strings are **pure ASCII** only (no en-dash / ellipsis glyphs that broke some fonts). |
+| **Exclusive resume still corrupted after stop-then-Play** | **Fixed (HK)** | After mode switch: full `attachTransportWithRatePolicy` rebuild; Play forces rebuild flag if needed; position saved to resume cleanly. |
+| **UI lag scaling to 2K / fullscreen** | **Fixed (HJ)** | Main window is **fixed size** (~1152×900), **not resizable**, **no maximize**. Matches design canvas for a crisp listening-room background. |
+| **Other apps lose sound while Exclusive is on** | **Expected** | WASAPI Exclusive takes the device. Documented below. |
+| **Other apps stay dead after quitting VOID** | **Fixed (HJ)** | Quit path calls **`closeAudioDevice`** so exclusive is released before process exit. |
+| **Controls not explained for non-audiophiles** | **Documented (this section)** | Full plain-language guide to every button, slider, toggle, and combo below. |
+| **Multi-Band Tape panel look** | **Shipped (HJ)** | Widescreen panel background from `GUI/68.jpg` (embedded 1152×628, contain + veil). |
+
+### Exclusive mode — what users should know
+
+- **ON (default Concert):** best quality / low-latency path to the DAC. **Other apps usually cannot play sound on that device until you switch to Shared or quit VOID.**
+- **OFF (Shared):** Windows mixes VOID with browsers, Discord, system sounds, etc.
+- **Toggling Exclusive while a track is loaded:** playback **stops** on purpose. Wait for *“Exclusive ready - press Play”* or *“Shared ready - press Play”*, then press **Play**. Do not expect seamless hot-swap mid-song (that path caused static).
+
+### Restore points (recent)
+
+| Path | Contents |
+|------|----------|
+| `_restore_points/ship_HF_clean_audio_*` | Clean exclusive audio (pre-UI polish) |
+| `_restore_points/ship_HJ_ui_exclusive_*` | Quit release + fixed window + multiband bg |
+| Current tree | **HK** = HJ + exclusive rebuild + ASCII billboard |
+
+---
+
+# Controls guide (plain language)
+
+You do **not** need to be an audiophile to use VOID Player. Start with defaults, load music, press Play. Use this section when you wonder “what does this knob do?”
+
+**Quick start**
+
+1. **Load Folder** (or **Load Audio**) — pick your music.  
+2. Optional: **Load IR** — pick a reverb “space” file (impulse response).  
+3. Leave **Exclusive** ON if you want best sound and can give VOID the sound device.  
+4. Press **Play**.  
+5. Adjust **Master Volume** first. Only then touch wet/reverb if you want more space.
+
+**Tip:** If something sounds broken after changing **Exclusive** or **Buffer Size**, press **Stop**, change the setting, wait for the status line, then **Play** again.
+
+---
+
+## Transport & library
+
+| Control | What it does (simple) | When to touch it |
+|---------|------------------------|------------------|
+| **Load Audio** | Opens one song/file into the playlist. | Single tracks. |
+| **Load Folder** | Scans a folder for supported music and builds a playlist. | Albums / libraries. |
+| **Load IR** | Loads a reverb impulse (the “room” or hall imprint). | After you have music; shapes the wet space. |
+| **Play / Stop** | Starts or stops playback. Green = ready to play; red = playing. | Main control. |
+| **Playlist** | List of loaded tracks. Click a row to switch tracks. | Pick a song; don’t need to reload the folder. |
+| **Seek bar** | Scrub through the current track (drag). | Jump in the song. |
+| **Time labels** | Show current time and length. | Read-only. |
+| **Status billboard** | Top message strip: track name, settings feedback, errors. | Read when something changes. |
+
+**Supported music types (typical):** WAV, FLAC, MP3, AIFF, OGG, M4A/AAC, and similar common formats.
+
+---
+
+## Volume & reverb mix
+
+| Control | What it does (simple) | Beginner guidance |
+|---------|------------------------|-------------------|
+| **Master Volume** | Overall loudness of everything leaving the player. | **Start here.** If it’s too quiet/loud, this is the first fix. |
+| **Dry / Wet** | Balance between the **dry** signal (the recording itself) and the **wet** signal (reverb/space/processing). Higher = more “in a room / hall.” | Leave near Concert default until you understand reverb. 0% = mostly dry song; higher % = more effect. |
+| **Reverb Gain (dB)** | How strong the reverb engine is driven (how “loud” the space is inside the wet path). | Raise for bigger halls; lower if reverb drowns the music. |
+| **Wet Output Gain (dB)** | Final volume of the wet (effect) path after reverb. | Fine-tune reverb level without changing dry volume as much. |
+
+**dB** = decibels, a loudness scale. **0 dB** ≈ “unity” (no boost/cut). Positive = louder; negative = quieter.
+
+---
+
+## Sound device & performance
+
+| Control | What it does (simple) | Beginner guidance |
+|---------|------------------------|-------------------|
+| **Exclusive (Bit-Perfect / Low-Latency)** | When ON, Windows gives VOID more direct control of your speakers/DAC (**best quality**, lower latency). When OFF (**Shared**), Windows mixes VOID with other apps. | **ON** for focused listening. **OFF** if you need YouTube/Discord/system sounds at the same time. **Toggling stops playback** — press Play after the status says ready. |
+| **Buffer Size** | How much audio is prepared per slice (16…2048 samples). **Larger = more stable, more delay.** Smaller = snappier, easier to glitch on weak PCs. | Ship default **2048** is safest. Only lower if you need lower latency and the PC stays clean. |
+| **Upsampling** | Extra internal processing stages for the “warmth/soft-clip” path (Off, x2, x4, x8, x16). Higher = more CPU. | Ship default **x2**. Use **Off** on weak laptops. Don’t jump to x16 unless the machine is strong and sound stays clean. |
+| **CPU Affinity** | Which CPU cores the player prefers (Auto, cores 2–7, Ryzen/Intel specialty options). | Leave **Auto**. Change only if a support note tells you to. |
+| **Purity Mode (Extreme Priority)** | Asks Windows to treat the audio thread as higher priority. | Optional. ON for critical listening sessions; OFF is fine for normal use. |
+
+---
+
+## Tone & character (the “VOID sound”)
+
+| Control | What it does (simple) | Beginner guidance |
+|---------|------------------------|-------------------|
+| **Soft Clip Dry (Analog Warmth)** | Adds gentle saturation to the dry path so peaks don’t hard-clip; sounds more “analog glue.” | ON by default. OFF for a colder, more clinical dry tone. |
+| **Warmth Drive** | How hard that warmth is pushed (drive amount). | Higher = thicker/more saturated; lower = cleaner. |
+| **Saturation Type** | Flavor of that warmth: **Off**, **Tape**, or **Tube**. | Tape = smoother tape-like; Tube = different harmonic flavor. Off = no sat type path. |
+| **Full Fixed-Point Path** | Uses VOID’s integer (Q30) processing identity for the signature chain. | Leave **ON** for the designed sound. OFF is for comparison/lab, not daily listening. |
+| **VOID Kernel** | Short “early” reverb sweetener (fine early reflections). | ON by default (Concert). OFF if you want less early IR cost or a different space. |
+| **VOID Console** | Console-style tone color (mix desk character). | ON for signature; OFF for cleaner path. |
+| **VOID Horn** | Forward “horn/presence” lift in the mid-highs. | ON for signature edge; OFF if too bright. |
+| **VOID Limiter** | Keeps peaks from blowing past a ceiling (safety + loudness control). | Leave ON unless you know you want un-limited peaks. |
+| **Bypass Reverb** | Turns the big reverb/space path off so you hear more dry music. | Use to A/B “with room” vs “dry.” |
+| **VOID Multi-Band Tape** | Opens the 7-band tape panel (see below). When ON, tape processing can run; panel edits each band. | ON for signature glue; open panel only when you want to tweak. |
+
+---
+
+## Limiter knobs (when Limiter is ON)
+
+| Control | What it does (simple) |
+|---------|------------------------|
+| **Threshold** | How loud a signal must get before limiting starts. Lower (more negative) = limiting engages sooner. |
+| **Ceiling** | Maximum peak level allowed out (safety cap). |
+| **Release** | How fast the limiter lets go after a loud peak. Longer = smoother, more “glued”; shorter = faster recovery. |
+
+---
+
+## Crossfade
+
+| Control | What it does (simple) |
+|---------|------------------------|
+| **Crossfade length** | When a playlist track ends and the next begins, how long the blend lasts (about 0.2–8 seconds). | Short ≈ almost instant handoff. Longer ≈ smoother DJ-style overlap. Default ~0.3 s is a good start. |
+
+---
+
+## Multi-Band Tape panel (7 bands)
+
+Opens when **VOID Multi-Band Tape** is turned ON. Think of it as a **tape machine with seven frequency lanes** (from deep bass to airy highs):
+
+| Band (typical) | Frequency region (plain English) |
+|----------------|----------------------------------|
+| **Sub** | Very low bass / rumble |
+| **Low** | Bass |
+| **LoMid** | Low mids (body, warmth) |
+| **Mid** | Core midrange (vocals/instruments body) |
+| **HiMid** | Upper mids (presence, edge) |
+| **High** | Treble |
+| **Air** | Very high “air” / sparkle |
+
+**Per band:**
+
+| Control | What it does (simple) |
+|---------|------------------------|
+| **Enabled** | That band’s tape processing on/off. |
+| **Drive** | How hard that band is “hit” into tape saturation. Higher = more grind/glue in that range. |
+| **Comp** | Compression on that band (evens out loud/soft). |
+| **Threshold / Ratio** | When compression starts and how strongly it squashes. |
+| **Roll-off** | Soft high-cut on that band (darkens the top). |
+| **Cutoff** | Where that roll-off starts (Hz). |
+
+**Close** dismisses the panel. Background art is decorative only (does not change sound by itself).
+
+---
+
+## Presets (if shown)
+
+| Control | What it does (simple) |
+|---------|------------------------|
+| **Presets / VOID Signature Sound** | One-click factory balances (Signature, Deep Void, etc., when available). | Start with **VOID Signature Sound / Concert** defaults after install. |
+
+---
+
+## “What should I leave alone?”
+
+Safe daily driver (HF/HK Concert intent):
+
+- Exclusive **ON** (or OFF if you need other apps’ sound)  
+- Buffer **2048**  
+- Upsampling **x2**  
+- Kernel **ON**  
+- Fixed-point **ON**  
+- CPU Affinity **Auto**  
+- Tape / Console / Horn / Limiter **ON** as shipped  
+- Master Volume to taste  
+
+Only change more controls after you’re comfortable with Play/Stop and volume.
+
+---
+
+# CURRENTLY SHIPPING — technical inventory (HF core + HJ/HK polish)
+
+**Audio core tag:** HF clean exclusive soak (VoidBuffering, kernel ON, ups x2).  
+**UI/device polish:** HJ fixed window, quit releases exclusive, multiband bg; **HK** exclusive rebuild + ASCII status.  
+
+**Restore (audio):** `_restore_points/ship_HF_clean_audio_*`  
+**Restore (UI+exclusive):** `_restore_points/ship_HJ_ui_exclusive_*`  
+
+This section is the **authoritative technical inventory** (compile-time flags, defaults, audio graph, DSP, UI, OS integration). Earlier README lore may describe historical or extreme experiments; **this section wins for “what ships now.”**
 
 ---
 
